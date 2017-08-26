@@ -594,7 +594,7 @@ def col_choose(para_dict, header_ind, headers):
             else:
                 try:
                     p_ind = int(p) - 1
-                    if p_ind not in select:
+                    if p_ind >= 0 and p_ind not in select: # do not support minus index selection
                         select.append(p_ind)
                 except ValueError as e:
                     pass
@@ -621,9 +621,10 @@ def main():
         else:
             if set(para_dict) & set(para):
                 para_use_ind.append(i)
+    max_para_ind = max(para_use_ind)
     fo.write('\t'.join([headers[x] for x in output_col_ind]) + '\n')
     for line in fi_annovar:
-        items = line.strip('\n').split('\t')
+        items = line.strip('\n').split('\t', max_para_ind + 1)
         match = True
         for i in para_use_ind:
              match &= para_judge(para_dict, headers[i], items[i])
