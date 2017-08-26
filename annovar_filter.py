@@ -613,7 +613,6 @@ def main():
     output_col_ind = col_choose(para_dict, header_all_ind, headers)
     if 's' not in para_dict or para_dict['s'] == '2':
         output_col_ind = [x for x in list(range(len(headers))) if x in output_col_ind]
-    print(output_col_ind)
     para_use_ind = []
     for i in header_all_ind:
         para = header_para_dict[headers[i]]
