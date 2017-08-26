@@ -31,6 +31,9 @@
             Similar to the annovar_file
 """
 
+import re
+import sys
+
 usage = """
     Usage: [-in input_annovar_file] [-out output_extract_file] [-h help] [-e empty] [filters]
            [-col columns to output] [-s sort the columns by -col para]
@@ -278,6 +281,7 @@ usage = """
 
 """
 
+
 # map the header of annovar file to the argvs
 header_para_dict = {
     'chr':'chr',
@@ -333,6 +337,7 @@ header_para_dict = {
     'SiPhy_29way_logOdds':'sp',
 }
 
+
 # construct the discrete para trans dictionary
 discrete_paras = ['chr', 'zyg', 'reg', 'exf', 'snp', 'sift_p', 'pp_hdiv_p', 'pp_hvar_p', 'lrt_p',
                   'tas_p', 'ass_p', 'fm_p', 'pv_p', 'fmm_p', 'metasvm_p', 'metalr_p', 'mcap_p',
@@ -340,99 +345,141 @@ discrete_paras = ['chr', 'zyg', 'reg', 'exf', 'snp', 'sift_p', 'pp_hdiv_p', 'pp_
 discrete_para_options = {x:{} for x in discrete_paras}
 
 discrete_para_options['chr'] = {str(x):'chr' + str(x) for x in range(1, 23)}
-discrete_para_options['chr']['X'] = discrete_para_options['chr']['x'] = 'chrX'
-discrete_para_options['chr']['Y'] = discrete_para_options['chr']['y'] = 'chrY'
-discrete_para_options['chr']['S'] = discrete_para_options['chr']['s'] = ('chrX', 'chrY')
-discrete_para_options['chr']['A'] = discrete_para_options['chr']['a'] = tuple(['chr' + str(x) for x in range(1, 23)])
+discrete_para_options['chr'].update({
+    'x': 'chrX',
+    'Y': 'chrY',
+    'S': ('chrX', 'chrY'),
+    'A': tuple(['chr' + str(x) for x in range(1, 23)])
+})
 
-discrete_para_options['zyg']['1'] = discrete_para_options['zyg']['hom'] = 'hom'
-discrete_para_options['zyg']['2'] = discrete_para_options['zyg']['het'] = 'het'
+discrete_para_options['zyg'] = {
+    '1': 'hom', 'hom': 'hom',
+    '2': 'het', 'het': 'het'
+}
 
-discrete_para_options['reg']['1'] = discrete_para_options['reg']['exon'] = 'exonic'
-discrete_para_options['reg']['2'] = discrete_para_options['reg']['intro'] = 'intronic'
-discrete_para_options['reg']['3'] = discrete_para_options['reg']['utr3'] = 'UTR3'
-discrete_para_options['reg']['4'] = discrete_para_options['reg']['utr5'] = 'UTR5'
-discrete_para_options['reg']['5'] = discrete_para_options['reg']['inter'] = 'intergenic'
-discrete_para_options['reg']['6'] = discrete_para_options['reg']['splicing'] = 'splicing'
-discrete_para_options['reg']['7'] = discrete_para_options['reg']['nc'] = ('ncRNA_exonic', 'ncRNA_intronic', 'ncRNA_splicing')
-discrete_para_options['reg']['8'] = discrete_para_options['reg']['up'] = 'upstream'
-discrete_para_options['reg']['9'] = discrete_para_options['reg']['down'] = 'downstream'
+discrete_para_options['reg'] = {
+    '1': 'exonic', 'exon': 'exonic',
+    '2': 'intronic', 'intro': 'intronic',
+    '3': 'UTR3', 'utr3': 'UTR3',
+    '4': 'UTR5', 'utr5': 'UTR5',
+    '5': 'intergenic', 'inter': 'intergenic',
+    '6': 'splicing', 'splicing': 'splicing',
+    '7': ('ncRNA_exonic', 'ncRNA_intronic', 'ncRNA_splicing'),
+    'nc': ('ncRNA_exonic', 'ncRNA_intronic', 'ncRNA_splicing'),
+    '8': 'upstream', 'up': 'upstream',
+    '9': 'downstream', 'down': 'downstream'
+}
 
-discrete_para_options['exf']['1'] = discrete_para_options['exf']['syn'] = 'synonymous SNV'
-discrete_para_options['exf']['2'] = discrete_para_options['exf']['nonsyn'] = 'nonsynonymous SNV'
-discrete_para_options['exf']['3'] = discrete_para_options['exf']['fsdel'] = 'frameshift deletion'
-discrete_para_options['exf']['4'] = discrete_para_options['exf']['fsins'] = 'frameshift insertion'
-discrete_para_options['exf']['5'] = discrete_para_options['exf']['nfsdel'] = 'nonframeshift deletion'
-discrete_para_options['exf']['6'] = discrete_para_options['exf']['nfsins'] = 'nonframeshift insertion'
-discrete_para_options['exf']['7'] = discrete_para_options['exf']['stopg'] = 'stopgain'
-discrete_para_options['exf']['8'] = discrete_para_options['exf']['stopl'] = 'stoploss'
-discrete_para_options['exf']['9'] = discrete_para_options['exf']['uk'] = 'unkown'
+discrete_para_options['exf'] = {
+    '1': 'synonymous SNV', 'syn': 'synonymous SNV',
+    '2': 'nonsynonymous SNV', 'nonsyn': 'nonsynonymous SNV',
+    '3': 'frameshift deletion', 'fsdel': 'frameshift deletion',
+    '4': 'frameshift insertion', 'fsins': 'frameshift insertion',
+    '5': 'nonframeshift deletion', 'nfsdel': 'nonframeshift deletion',
+    '6': 'nonframeshift insertion', 'nfsins': 'nonframeshift insertion',
+    '7': 'stopgain', 'stopg': 'stopgain',
+    '8': 'stoploss', 'stopl': 'stoploss',
+    '9': 'unkown', 'uk': 'unkown'
+}
 
-discrete_para_options['sift_p']['1'] = discrete_para_options['sift_p']['D'] = 'D'
-discrete_para_options['sift_p']['2'] = discrete_para_options['sift_p']['T'] = 'T'
+discrete_para_options['sift_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'T', 'T': 'T'
+}
 
-discrete_para_options['pp_hdiv_p']['1'] = discrete_para_options['pp_hdiv_p']['D'] = 'D'
-discrete_para_options['pp_hdiv_p']['2'] = discrete_para_options['pp_hdiv_p']['P'] = 'P'
-discrete_para_options['pp_hdiv_p']['3'] = discrete_para_options['pp_hdiv_p']['B'] = 'B'
+discrete_para_options['pp_hdiv_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'P', 'P': 'P',
+    '3': 'B', 'B': 'B',
+}
 
-discrete_para_options['pp_hvar_p']['1'] = discrete_para_options['pp_hvar_p']['D'] = 'D'
-discrete_para_options['pp_hvar_p']['2'] = discrete_para_options['pp_hvar_p']['P'] = 'P'
-discrete_para_options['pp_hvar_p']['3'] = discrete_para_options['pp_hvar_p']['B'] = 'B'
+discrete_para_options['pp_hvar_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'P', 'P': 'P',
+    '3': 'B', 'B': 'B',
+}
 
-discrete_para_options['lrt_p']['1'] = discrete_para_options['lrt_p']['D'] = 'D'
-discrete_para_options['lrt_p']['2'] = discrete_para_options['lrt_p']['N'] = 'N'
-discrete_para_options['lrt_p']['3'] = discrete_para_options['lrt_p']['U'] = 'U'
+discrete_para_options['lrt_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'N', 'N': 'N',
+    '3': 'U', 'U': 'U'
+}
 
-discrete_para_options['tas_p']['1'] = discrete_para_options['tas_p']['A'] = 'A'
-discrete_para_options['tas_p']['2'] = discrete_para_options['tas_p']['D'] = 'D'
-discrete_para_options['tas_p']['3'] = discrete_para_options['tas_p']['P'] = 'P'
-discrete_para_options['tas_p']['4'] = discrete_para_options['tas_p']['N'] = 'N'
+discrete_para_options['tas_p'] = {
+    '1': 'A', 'A': 'A',
+    '2': 'D', 'D': 'D',
+    '3': 'P', 'P': 'P',
+    '4': 'N', 'N': 'N'
+}
 
-discrete_para_options['ass_p']['1'] = discrete_para_options['ass_p']['H'] = 'H'
-discrete_para_options['ass_p']['2'] = discrete_para_options['ass_p']['M'] = 'M'
-discrete_para_options['ass_p']['3'] = discrete_para_options['ass_p']['L'] = 'L'
-discrete_para_options['ass_p']['4'] = discrete_para_options['ass_p']['N'] = 'N'
+discrete_para_options['ass_p'] = {
+    '1': 'H', 'H': 'H',
+    '2': 'M', 'M': 'M',
+    '3': 'L', 'L': 'L',
+    '4': 'N', 'N': 'N',
+}
 
-discrete_para_options['fm_p']['1'] = discrete_para_options['fm_p']['D'] = 'D'
-discrete_para_options['fm_p']['2'] = discrete_para_options['fm_p']['T'] = 'T'
+discrete_para_options['fm_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'T', 'T': 'T'
+}
 
-discrete_para_options['pv_p']['1'] = discrete_para_options['pv_p']['D'] = 'D'
-discrete_para_options['pv_p']['2'] = discrete_para_options['pv_p']['N'] = 'N'
+discrete_para_options['pv_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'N', 'N': 'N'
+}
 
-discrete_para_options['fmm_p']['1'] = discrete_para_options['fmm_p']['D'] = 'D'
-discrete_para_options['fmm_p']['2'] = discrete_para_options['fmm_p']['N'] = 'N'
+discrete_para_options['fmm_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'N', 'N': 'N'
+}
 
-discrete_para_options['metasvm_p']['1'] = discrete_para_options['metasvm_p']['D'] = 'D'
-discrete_para_options['metasvm_p']['2'] = discrete_para_options['metasvm_p']['T'] = 'T'
+discrete_para_options['metasvm_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'T', 'T': 'T'
+}
 
-discrete_para_options['metalr_p']['1'] = discrete_para_options['metalr_p']['D'] = 'D'
-discrete_para_options['metalr_p']['2'] = discrete_para_options['metalr_p']['T'] = 'T'
+discrete_para_options['metalr_p'] = {
+    '1': 'D', 'D': 'D',
+    '2': 'T', 'T': 'T'
+}
 
-discrete_para_options['mcap_p']['1'] = discrete_para_options['mcap_p']['P'] = '(Likely)Pathogenic'
-discrete_para_options['mcap_p']['2'] = discrete_para_options['mcap_p']['B'] = '(Likely)Benign'
+discrete_para_options['mcap_p'] = {
+    '1': '(Likely)Pathogenic', 'P': '(Likely)Pathogenic',
+    '2': '(Likely)Benign', 'B': '(Likely)Benign'
+}
 
-discrete_para_options['car']['1'] = discrete_para_options['car']['P'] = 'Pathogenic'
-discrete_para_options['car']['2'] = discrete_para_options['car']['LP'] = 'Likely pathogenic'
-discrete_para_options['car']['3'] = discrete_para_options['car']['B'] = 'Benign'
-discrete_para_options['car']['4'] = discrete_para_options['car']['LB'] = 'Likely benign'
-discrete_para_options['car']['5'] = discrete_para_options['car']['DR'] = 'drug response'
-discrete_para_options['car']['6'] = discrete_para_options['car']['U'] = 'Uncertain significance'
-discrete_para_options['car']['7'] = discrete_para_options['car']['N'] = 'not provided'
-discrete_para_options['car']['8'] = discrete_para_options['car']['O'] = 'other'
+discrete_para_options['car'] = {
+    '1': 'Pathogenic', 'P': 'Pathogenic',
+    '2': 'Likely pathogenic', 'LP': 'Likely pathogenic',
+    '3': 'Benign', 'B': 'Benign',
+    '4': 'Likely benign', 'LB': 'Likely benign',
+    '5': 'drug response', 'DR': 'drug response',
+    '6': 'Uncertain significance', 'U': 'Uncertain significance',
+    '7': 'not provided', 'N': 'not provided',
+    '8': 'other', 'O': 'other'
+}
 
+
+# construct the valid paras and the continuous paras
+def to_tuple(x):
+    """Convert a string or float or integer to tuple format
+    e.g: trans 'str' to ('str', ).
+        x: str or int or float or tuple or list or a dict
+        return: tuple
+    """
+    if type(x) in [type(''), type('1'), type('0.1')]:
+        return (x, )
+    else:
+        return tuple(x)
 
 para_names = header_para_dict.keys()
 valid_paras = []
 for k, v in header_para_dict.items():
-    if type(v) == type(''):
-        valid_paras.append(v)
-    else:
-        valid_paras.extend(list(v))
+    valid_paras.extend(list(to_tuple(v)))
 continuous_paras = [x for x in valid_paras if x not in discrete_paras]
-valid_paras += ['in', 'out', 'e', 'col', 's']
+valid_paras += ['in', 'out', 'e', 'col', 's'] # additinal file or control paras.
 
-import re
-import sys
 
 def argv_process(argv):
     """parse the argv into the argv:para dict
@@ -446,7 +493,7 @@ def argv_process(argv):
         print(usage)
         sys.exit()
     all_para_names = re.findall(r'-(\w+)', argv)
-    argv += '-'
+    argv += '-' # add a '-' tail to make the para regex more comfortable.
     para_dict = {}
     para = re.compile(r'-(\w+)\s+([\w\s,:.]+)(?=-)')
     while 1:
@@ -458,11 +505,11 @@ def argv_process(argv):
         para_value = re.sub(r'[\s,]+','\t', para_value).strip().split('\t')
         para_dict[para_key] = para_value
         argv = argv[:res.start()] + argv[res.end():]
-    if 'in' not in para_dict or 'out' not in para_dict:
+    if 'in' not in para_dict or 'out' not in para_dict: # in and out para are essential.
         print('Lack of Input file or Output file')
         sys.exit()
-    unmatch_para_names = [x for x in all_para_names if x not in valid_paras]
-    if unmatch_para_names:
+    unvalid_para_names = [x for x in all_para_names if x not in valid_paras]
+    if unvalid_para_names:
         print('Unvalid Argv: ' + ' '.join(unmatch_para_names))
         sys.exit()
     empty_para_names = [x for x in all_para_names if x not in para_dict]
@@ -481,16 +528,15 @@ def para_judge(para_dict, para_name, content):
     empty_include = True
     if para_dict.get('e', None) == 2:
         empty_include = False
-    paras = header_para_dict[para_name]
-    if type(paras) == type(''):
-        paras = (paras,) # trans the str to tuple format to unify paras format
+    paras = to_tuple(header_para_dict[para_name])
     contents = content.split(',')
-    if 1 == len(contents) < len(paras): # empty content, span it to the same length of paras
+    if 1 == len(contents) < len(paras): # empty content, duplicate it to the same length of paras
         contents *= len(paras)
+
     match = True
     for i in range(len(paras)):
         p, c = paras[i], contents[i]
-        cs = c.replace('\\x2c', '|').replace(',', '|').split('|')
+        cs = c.replace('\\x2c', '|').replace(',', '|').split('|') # contents, replace the strange sep char to '|'
         if p not in para_dict:
             continue
         if p in discrete_paras:
@@ -509,9 +555,7 @@ def para_judge(para_dict, para_name, content):
                     else:
                         op_match |= x in c # not use cs because the OMIM content and the key word is difficult to split.
                 else:
-                    option = discrete_para_options[p][x]
-                    if type(option) == type(''):
-                        option = (option, )
+                    option = to_tuple(discrete_para_options[p][x])
                     for op in option:
                         op_match |= op in cs # use cs because the content has been split and op is well to match.
                     if empty_include:
@@ -587,7 +631,7 @@ def col_choose(para_dict, header_ind, headers):
                     select.append(p_ind)
             elif p in valid_paras:
                 for k, v in header_para_dict.items():
-                    if (type(v) == type('') and p == v) or (type(v) == type((1,)) and p in v):
+                    if p in to_tuple(v):
                         p_ind = headers.index(k)
                         if p_ind in header_ind and p_ind not in select:
                             select.append(p_ind)
@@ -613,6 +657,7 @@ def main():
     output_col_ind = col_choose(para_dict, header_all_ind, headers)
     if 's' not in para_dict or para_dict['s'] == '2':
         output_col_ind = [x for x in list(range(len(headers))) if x in output_col_ind]
+    print(output_col_ind)
     para_use_ind = []
     for i in header_all_ind:
         para = header_para_dict[headers[i]]
